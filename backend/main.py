@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from datetime import datetime
 import uuid
 import sqlite3
+import bcrypt
 
 # database.py에서 함수 가져오기
 from database import init_db, get_db_connection
@@ -93,3 +94,39 @@ def save_log(log_data: LogRequest):
     except Exception as e:
         print(f"🔥 [에러 발생] {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+# 4. 로그인 요청 데이터 모델
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+# ==========================
+# 🔑 관리자 로그인 API (POST)
+# ==========================
+@app.post("/api/admin/login")
+def admin_login(login_data: LoginRequest):
+    conn = get_db_connection()
+    # 1. DB에서 해당 아이디의 관리자 찾기
+    admin = conn.execute(
+        "SELECT * FROM admins WHERE username = ?", (login_data.username,)
+    ).fetchone()
+    conn.close()
+
+    if not admin:
+        raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 틀렸습니다.")
+    
+
+    # 2. 비밀번호 검증 (DB의 해시값과 입력값 비교)
+    # admin['password_hash']는 database.py에서 만든 1234의 해시값
+    if bcrypt.checkpw(login_data.password.encode('utf-8'), admin['password_hash'].encode('utf-8')):
+        print(f"🔓 [로그인 성공] 관리자: {login_data.username}")
+        return {
+            "status": "success",
+            "message": "로그인에 성공했습니다.",
+            "access_token": "fake-jwt-token-v2", # 나중에 진짜 JWT로 교체 예정
+            "token_type": "bearer"
+        }
+    else:
+        print(f"🔒 [로그인 실패] 관리자: {login_data.username}")
+        raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 틀렸습니다.")
