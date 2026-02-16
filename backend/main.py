@@ -1,17 +1,20 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import json
-import os
+from pydantic import BaseModel
 from datetime import datetime
 import uuid
-from pydantic import BaseModel
+import sqlite3
+
+# database.py에서 함수 가져오기
+from database import init_db, get_db_connection
 
 app = FastAPI()
 
-origins = [
-    "*",
-]
+# 1. 서버 시작 시 DB 확인 (테이블 없으면 생성)
+init_db()
 
+# 2. CORS 설정 (프론트엔드 연동 준비)
+origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -20,98 +23,73 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PRODUCTS_FILE = os.path.join(os.path.dirname(__file__), 'products.json')
-LOG_FILE_PATH = os.path.join(os.path.dirname(__file__), 'logs.json')
-
-
-class LogRequest(BaseModel):
+# 3. 요청 데이터 검증 모델 (Pydantic)
+class LogRequest(BaseModel) :
     target_barcode: str
     consent_agreed: bool
     scanned_id_info: str
+    total_amount: int
 
-def get_product_from_db(barcode: str):
-    '''
-    바코드에 부합하는 상품 정보를 return 하는 함수
-    '''
-    # 있으면 데이터, 없으면 None 반환
-
-    if not os.path.exists(PRODUCTS_FILE):
-        return None
-    
-    with open(PRODUCTS_FILE, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-        return data.get(barcode)
-    
-
-# =======================
-# API 엔드포인트 (기능 구현)
-# =======================    
-
-@app.get("/product/{barcode}")
+# ==========================
+# 🛍️ 상품 조회 API (GET)
+# ==========================
+@app.get("/api/products/{barcode}")
 def scan_product(barcode: str):
-    print(f"🔎 [요청 받음] 바코드 조회: {barcode}")
-
-    product = get_product_from_db(barcode)
+    conn = get_db_connection()
+    # DB에서 바코드로 상품 찾기
+    product = conn.execute("SELECT * FROM products WHERE barcode = ?", (barcode,)).fetchone()
+    conn.close()
 
     if product:
-        print(f"✅ [성공] 상품 찾음: {product['name']}")
+        print(f"🔎 [상품 발견] {product['name']} ({product['price']}원)")
         return {
             "status": "success",
-            "data": product
+            "data": {
+                "name": product["name"],
+                "price": product["price"],
+                # 프론트엔드는 isAlcohol(camelCase)를 기대하므로 변환해서 전달
+                "isAlcohol": bool(product["is_alcohol"])
+            }
         }
     else:
-        print(f"❌ [실패] 상품 없음")
+        print(f"❌ [상품 없음] 바코드: {barcode}")
         return {
             "status": "fail",
             "message": "등록되지 않은 상품입니다."
         }
     
-# =======================
-# 로그 저장 API 엔드포인트 (POST /log)
-# =======================    
-@app.post("/log")
-async def save_log(log_data: LogRequest):
-    """
-    프론트엔드에서 인증 완료 정보(주류 바코드, 동의 여부, 신분증 정보)를 받아 
-    logs.json 파일에 저장 (DB 없음)
-    """
-    print(f"📝 [로그 저장 요청] 바코드: {log_data.target_barcode}, 신분증ID: {log_data.scanned_id_info}")
 
+# ==========================
+# 📝 결제 로그 저장 API (POST)
+# ==========================
+@app.post("/api/logs")
+def save_log(log_data: LogRequest):
     try:
-        # 저장할 최종 로그 데이터 생성 (서버 측 정보 추가)
-        final_log_entry = {
-            "log_id": str(uuid.uuid4()),                     # 고유 ID 생성
-            "timestamp": datetime.now().isoformat(),         # 현재 시간 기록
-            "target_barcode": log_data.target_barcode,       # 요청받은 주류 바코드
-            "consent_agreed": log_data.consent_agreed,       # 요청받은 동의 여부
-            "scanned_id_info": log_data.scanned_id_info      # 저장할 신분증 정보
-        }
-
-        # 기존 logs.json 파일 읽기
-        logs = []
-        if os.path.exists(LOG_FILE_PATH):
-            try:
-                with open(LOG_FILE_PATH, "r", encoding="utf-8") as f:
-                    file_content = f.read()
-                    # 파일이 비어있지 않으면 로드
-                    if file_content.strip():
-                        logs = json.loads(file_content)
-            except json.JSONDecodeError:
-                # 파일이 깨져있거나 비어있으면 빈 리스트로 시작
-                print("⚠️ logs.json 파일이 비어있거나 깨져있어 새로 작성합니다.")
-                logs = []
+        conn = get_db_connection()
+        log_id = str(uuid.uuid4()) # 고유 ID 생성
         
-        # 새 로그 추가
-        logs.append(final_log_entry)
+        # DB에 저장 (SQL Injection 방지를 위해 ? 사용)
+        conn.execute(
+            "INSERT INTO consent_logs (log_id, timestamp, target_barcode, consent_agreed, scanned_id_info, total_amount) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                log_id,
+                datetime.now().isoformat(),
+                log_data.target_barcode,
+                log_data.consent_agreed,
+                log_data.scanned_id_info,
+                log_data.total_amount
+            )
+        )
+        conn.commit() # 저장 확정
+        conn.close()
 
-        # 파일에 다시 쓰기
-        with open(LOG_FILE_PATH, "w", encoding="utf-8") as f:
-            json.dump(logs, f, ensure_ascii=False, indent=2)
-
-        print(f"✅ [로그 저장 성공] ID: {final_log_entry['log_id']}")
-        return {"status": "success", "message": "Log saved", "log_id": final_log_entry["log_id"]}
-
+        print(f"✅ [로그 저장 완료] ID: {log_id}, 금액: {log_data.total_amount}원")
+        return {
+            "status": "success",
+            "message": "Log saved",
+            "log_id": log_id
+        }
+        
     except Exception as e:
-        print(f"❌ [로그 저장 실패] 에러: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to save log: {str(e)}")
-
+        print(f"🔥 [에러 발생] {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
