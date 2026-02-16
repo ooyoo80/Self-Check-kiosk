@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
@@ -130,3 +130,54 @@ def admin_login(login_data: LoginRequest):
     else:
         print(f"🔒 [로그인 실패] 관리자: {login_data.username}")
         raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 틀렸습니다.")
+
+
+# ==========================
+
+# 📋 관리자 로그 조회 API (GET)
+
+# ==========================
+
+@app.get("/api/admin/logs")
+
+def get_logs(authorization: str = Header(None)):
+
+    # 1. 토큰 검사 (Security Check)
+
+    # 프론트엔드가 보낸 암호가 우리가 발급한 것과 맞는지 확인
+
+    if authorization != "Bearer fake-jwt-token-v2":
+
+        print(f"🚫 [접근 거부] 잘못된 토큰: {authorization}")
+
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+   
+
+    conn = get_db_connection()
+
+
+
+    # 2. 최신순으로 정렬해서 가져오기
+
+    rows = conn.execute("SELECT * FROM consent_logs ORDER BY timestamp DESC").fetchall()
+
+    conn.close()
+
+
+
+    # 3. 데이터 변환 (SQLite Row -> Dictionary List)
+
+    logs = [dict(row) for row in rows]
+
+
+
+    print(f"📋 [관리자 조회] 로그 {len(logs)}개 전송 완료")
+
+    return {
+
+        "status": "success",
+
+        "data": logs
+
+    }
