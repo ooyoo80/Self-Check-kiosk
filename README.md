@@ -167,7 +167,7 @@ Codyssey_Term_Project/
 
 ## 🗂️ ERD (Entity Relationship Diagram)
 
-![ERD](docs/ERDiagram_final.png)
+![ERD](docs/ERDiagram_v2.0.png)
 
 ---
 
