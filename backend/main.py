@@ -29,7 +29,7 @@ app.add_middleware(
 class LogRequest(BaseModel) :
     target_barcode: str
     consent_agreed: bool
-    scanned_id_info: str
+    scanned_id_info: str | None = None
     total_amount: int
 
 # ==========================
