@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // ============================================================
+    // 1. 변수 선언 및 초기화
+    // ============================================================
     let isScanningIdMode = false;
     let scannedIdValue = null;
 
@@ -22,16 +25,77 @@ document.addEventListener('DOMContentLoaded', () => {
     const legalNoBtn = document.getElementById('btn-legal-no');
 
     const finalPaymentModal = document.getElementById('finalPaymentModal');
-
     const finalPaymentListArea = document.getElementById('paymentItemsList');
     const finalPaymentTotalAmount = document.getElementById('paymentTotalAmount');
 
     const finalPayBtn = document.getElementById('btn-final-yes');
     const finalCancelBtn = document.getElementById('btn-final-no');
 
+    // 🕵️ [New] 관리자 관련 요소 가져오기
+    const adminTrigger = document.getElementById('admin-trigger');
+    const adminModal = document.getElementById('adminLoginModal');
+    const adminCloseBtn = document.getElementById('btn-admin-close');
+    const adminLoginBtn = document.getElementById('btn-admin-login');
+    const adminIdInput = document.getElementById('admin-username');
+    const adminPwInput = document.getElementById('admin-password');
+
     let cartList = [];
     // 중복 스캔으로 인한 중복 장바구니 추가를 방지하기 위한 타임스탬프 맵
     const recentAdds = {};
+
+    // ============================================================
+    // 2. 관리자 히든 트리거 로직 (5연타 감지)
+    // ============================================================
+    let clickCount = 0;
+    let clickTimer = null;
+
+    if (adminTrigger) {
+        adminTrigger.addEventListener('click', () => {
+            clickCount++;
+            console.log(`🕵️ 히든 트리거 클릭: ${clickCount}/5`);
+
+            // 1초 동안 추가 클릭 없으면 카운트 리셋
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => {
+                clickCount = 0;
+            }, 1000);
+
+            // 5번 연속 클릭 시 로그인 창 오픈!
+            if (clickCount >= 5) {
+                console.log("🔓 관리자 로그인 창 열림!");
+                if (adminModal) {
+                    adminModal.classList.add('show');
+                    // 창 열리면 아이디 입력칸에 바로 커서 가도록
+                    if (adminIdInput) adminIdInput.focus();
+                }
+                clickCount = 0; // 카운트 초기화
+            }
+        });
+    }
+
+    // 관리자 팝업 닫기 버튼
+    if (adminCloseBtn) {
+        adminCloseBtn.addEventListener('click', () => {
+            if (adminModal) adminModal.classList.remove('show');
+            // 입력창 초기화
+            if (adminIdInput) adminIdInput.value = '';
+            if (adminPwInput) adminPwInput.value = '';
+        });
+    }
+
+    // 관리자 로그인 버튼 (아직 API 연동 전, 로그만 출력)
+    if (adminLoginBtn) {
+        adminLoginBtn.addEventListener('click', () => {
+            const id = adminIdInput.value;
+            const pw = adminPwInput.value;
+            console.log(`🔑 로그인 시도 - ID: ${id}, PW: ${pw}`);
+            alert("관리자 로그인 기능 준비 중입니다.\n(입력된 ID: " + id + ")");
+        });
+    }
+
+    // ============================================================
+    // 3. 일반 키오스크 기능 로직
+    // ============================================================
 
     // [보조 함수] 장바구니 아이템 클릭 핸들러 분리 (재사용 위해)
     function handleCartItemClick(e) {
@@ -149,13 +213,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="item title">구매 목록</div>
                 <div class="item list"></div>
 
-                <div class="total-pay">
-                    <div class="item-total">
-                        <span class="total-label">총액</span>
-                        <span class="total-amount">₩0</span>
-                    </div>
-                    <div class="action-container">
-                        <button id="btn-pay" class="pay-button">결제하기</button>
+                <div class="item pay">
+                    <div class="total-pay">
+                        <div class="item-total">
+                            <span class="total-label">총액</span>
+                            <span class="total-amount">₩0</span>
+                        </div>
+                        <div class="action-container">
+                            <button id="btn-pay" class="pay-button">결제하기</button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -177,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statusMessage) statusMessage.innerText = "상태: 결제 완료 (대기 중)";
     }
 
-    // 최종 결제 팝업 '결제하기' 버튼 클릭 시 (API 연동 핵심 로직)
+    // 최종 결제 팝업 '결제하기' 버튼 클릭 시
     if (finalPayBtn) {
         finalPayBtn.addEventListener('click', async () => {
             console.log("💰 최종 '결제하기' 버튼 클릭!");
@@ -193,18 +259,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const hasAlcohol = cartList.some(item => item.isAlcohol === true);
             console.log("🍸 주류 포함 여부:", hasAlcohol);
 
+            // [수정] 총액 계산
+            const totalPrice = cartList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
             if (hasAlcohol) {
-                // Case 1: 주류 있음 -> 로그 저장 API 호출
+                // Case 1: 주류 있음 -> 로그 저장 API 호출 필요
                 console.log("📡 주류 포함: 로그 저장 시도");
 
                 // 데이터 준비
                 const alcoholItem = cartList.find(item => item.isAlcohol);
-                // 바코드 가져오기 (없으면 첫 번째 상품 바코드)
+                // 바코드 가져오기
                 const targetBarcode = alcoholItem ? alcoholItem.barcode : cartList[0].barcode;
-                // 신분증 정보 가져오기 (없으면 시뮬레이션 문자열)
+                // 신분증 정보 가져오기
                 const finalScannedId = scannedIdValue || "SIMULATED_ID_NOT_SCANNED";
-
-                const totalPrice = cartList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
                 showToast("결제 진행 중... (로그 저장)", "info");
                 if (statusMessage) statusMessage.innerText = "상태: 결제(로그 저장) 처리 중...";
@@ -220,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             target_barcode: String(targetBarcode),
                             consent_agreed: true,
                             scanned_id_info: String(finalScannedId),
-                            total_amount: Number(totalPrice)
+                            total_amount: Number(totalPrice) // 총액 추가됨
                         }),
                     });
 
@@ -228,17 +295,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log("✅ [응답] 로그 저장 결과:", result);
 
                     if (response.ok && result.status === "success") {
-                        // 성공 시
+                        // 성공 시 처리
                         console.log("✅ 로그 저장 및 결제 완료 성공!");
 
                         if (finalPaymentModal) {
-                            finalPaymentModal.classList.remove('show');
+                            finalPaymentModal.classList.remove('show'); // 팝업 닫기
                         }
                         showToast("결제가 완료되었습니다. 감사합니다!", "success");
 
+                        // UI 및 데이터 초기화 함수 호출
                         resetUIAfterPayment();
+
                     } else {
-                        // 실패 시
+                        // 실패 시 처리
                         console.error("❌ 로그 저장 실패:", result.message || result.detail);
                         throw new Error(result.message || "로그 저장 실패");
                     }
@@ -332,7 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * [데이터 관리] 장바구니 배열에 상품 추가
      */
     function addToCart(productToAdd) {
-        // 중복 감지
+        // 중복 감지: 같은 바코드가 아주 짧은 시간 내(800ms)에 들어오면 무시
         try {
             const now = Date.now();
             const last = recentAdds[productToAdd.barcode] || 0;
@@ -341,18 +410,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             recentAdds[productToAdd.barcode] = now;
-        } catch (e) {}
-
+        } catch (e) {
+            // 안전성: productToAdd.barcode가 없으면 그냥 진행
+        }
         const existingItem = cartList.find(item => item.barcode === productToAdd.barcode);
 
         if (existingItem) {
             existingItem.quantity += 1;
         } else {
-            cartList.push({
-                ...productToAdd,
+            cartList.push({ ...productToAdd,
                 quantity: 1
             });
         }
+        // 장바구니 UI 업데이트
         updateCartUI();
     }
 
@@ -373,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * [UI 렌더링] 장바구니 화면 업데이트
+     * [UI 렌더링] 장바구니 화면을 배열 데이터에 맞춰 다시 그리는 함수
      */
     function updateCartUI() {
         if (!cartListArea) {
@@ -388,6 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const itemTotalPrice = item.price * item.quantity;
             totalPrice += itemTotalPrice;
 
+            // HTML 템플릿 생성
             const itemHTML = `
                 <div class="item-card" data-barcode="${item.barcode}">
                     <div class="item-info">
@@ -404,27 +475,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             `;
+            // 생성 HTML 목록 영역에 추가 (항목은 추가된 순서대로 아래로 쌓이도록 'beforeend' 사용)
             cartListArea.insertAdjacentHTML('beforeend', itemHTML);
         });
 
         if (totalAmountElement) {
             totalAmountElement.innerText = `₩${totalPrice.toLocaleString()}`;
         }
+
+        // 새로 추가된 항목이 맨 위에 오므로 스크롤을 맨 위로 이동
         cartListArea.scrollTop = 0;
     }
 
     // 주류 안내 메시지 렌더링 함수
     function renderAlcoholNotice(product, barcode) {
         try {
+            // products.json에서 불러오는 불리언 isAlcohol이 true이면 주류로 판단
             const isAlcohol = !!(product && product.isAlcohol === true);
 
             if (!isAlcohol) return;
 
+            // 중복 표시 방지
             const existing = document.getElementById('alcohol-notice');
             if (existing) existing.remove();
 
             const notice = document.createElement('div');
             notice.id = 'alcohol-notice';
+
             notice.className = 'alcohol-notice-popup';
 
             notice.innerHTML = `
@@ -486,83 +563,108 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 결제 버튼 클릭 핸들러 (주류 판단 로직)
     function handlePaymentClick() {
+        // 장바구니 비었는지 확인
         if (cartList.length === 0) {
             alert("장바구니에 담긴 상품이 없습니다.");
             return;
         }
 
+        // 주류 포함 여부 확인
         const hasAlcohol = cartList.some(item => item.isAlcohol === true);
 
         if (hasAlcohol) {
             console.log("🚨 결제 시도: 주류 포함됨! -> 성인 인증 팝업 필요");
+
             if (ageModal) {
                 ageModal.classList.add('show');
+                console.log("팝업 클래스 'show' 추가 완료. 현재 클래스:", ageModal.className);
+            } else {
+                console.error("❌ 오류: ageModal 요소를 찾을 수 없습니다.");
             }
         } else {
+            // 주류 없음 -> 즉시 결제 완료
             console.log("✅ 결제 시도: 주류 없음 -> 즉시 결제 완료");
             showFinalPaymentModal();
         }
     }
 
-    // 결제 버튼 이벤트 리스너
+    // 결제 버튼에 이벤트 리스너 연결
     if (payButton) {
         payButton.addEventListener('click', handlePaymentClick);
+        console.log("결제 버튼 이벤트 리스너가 연결되었습니다.");
     }
 
-    // 모달 이벤트 리스너들
+    // 1차 팝업 버튼 이벤트
     if (ageYesBtn && ageModal && legalModal) {
         ageYesBtn.addEventListener('click', () => {
+            console.log("1차 '예' 클릭 -> 1차 닫고, 2차 팝업 열기");
             ageModal.classList.remove('show');
             legalModal.classList.add('show');
         });
     }
     if (ageNoBtn && ageModal) {
         ageNoBtn.addEventListener('click', () => {
+            console.log("1차 '아니오' 클릭 -> 팝업 닫기 및 주류 제거");
             ageModal.classList.remove('show');
+            console.log("팝업 닫힌 후 클래스:", ageModal.className);
         });
     }
 
     if (legalYesBtn && legalModal) {
         legalYesBtn.addEventListener('click', () => {
+            console.log("2차 '예' 클릭 -> 2차 닫고, 다음 단계(신분증 인식)로 이동 예정");
             legalModal.classList.remove('show');
+            // 3차 신분증 인식 웹캠 화면 보여주는 로직 호출
             showIdScanScreen();
         });
+
     }
 
     if (legalNoBtn && legalModal) {
         legalNoBtn.addEventListener('click', () => {
+            console.log("🖱️ 2차 '아니오' 클릭 -> 팝업 닫기 및 주류 제거");
             legalModal.classList.remove('show');
-            clearAlcoholItems();
+            clearAlcoholItems(); // 주류 제거
         });
+        console.log("✅ 2차 '아니오' 버튼 이벤트 리스너 연결 완료");
     }
 
     // 카메라 스캐너 설정 (Quagga)
     function startScanner() {
         const cameraElement = document.getElementById('camera');
-        if (!cameraElement) return;
+        if (!cameraElement) {
+            console.error("❌ 오류: 카메라 요소(camera)를 찾을 수 없습니다.");
+            return;
+        }
 
         Quagga.init({
-            inputStream: {
-                name: 'Live',
-                type: 'LiveStream',
-                target: cameraArea,
+                inputStream: {
+                    name: 'Live',
+                    type: 'LiveStream',
+                    target: cameraArea,
+                },
+                decoder: {
+                    readers: ['ean_reader', 'code_128_reader', 'ean_8_reader', 'code_39_reader', 'code_39_vin_reader', 'codabar_reader', 'upc_reader', 'upc_e_reader', 'i2of5_reader'],
+                },
+                locate: true,
+                frequency: 10
             },
-            decoder: {
-                readers: ['ean_reader', 'code_128_reader', 'ean_8_reader', 'code_39_reader', 'upc_reader'],
-            },
-            locate: true,
-            frequency: 10
-        }, function(err) {
-            if (err) {
-                console.error("Quagga initialization error : ", err);
-                return;
+
+            function(err) {
+                if (err) {
+                    console.error("Quagga initialization error : ", err);
+                    return;
+                }
+
+                console.log("Quagga initialization succeeded");
+                Quagga.start();
+
+                const videoElement = cameraArea.querySelector('video');
+                if (videoElement) {
+                    videoElement.style.transform = 'scaleX(-1)';
+                }
             }
-            Quagga.start();
-            const videoElement = cameraArea.querySelector('video');
-            if (videoElement) {
-                videoElement.style.transform = 'scaleX(-1)';
-            }
-        });
+        );
 
         let isScanning = false;
         let lastDetectedCode = null;
@@ -572,27 +674,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const code = data.codeResult.code;
             const now = Date.now();
 
+            // 동일 코드가 짧은 시간(2500ms) 내에 다시 들어오면 무시
             if (code === lastDetectedCode && (now - lastDetectedAt) < 2500) {
+                // console.debug('Quagga: duplicate detection suppressed', code);
                 return;
             }
             lastDetectedCode = code;
             lastDetectedAt = now;
 
-            if (isScanning) return;
+            if (isScanning) return; // 중복 스캔 방지
 
             console.log("Barcode detected: ", code);
-            isScanning = true;
 
+            isScanning = true; // 스캔 처리 시작
             let processPromise;
             if (isScanningIdMode) {
+                console.log("ℹ️ 현재 신분증 스캔 모드입니다.");
                 processPromise = handleScannedID(code);
             } else {
+                console.log("ℹ️ 현재 상품 스캔 모드입니다.");
                 processPromise = handleScannedCode(code);
             }
             processPromise.finally(() => {
                 setTimeout(() => {
                     isScanning = false;
                     if (statusMessage) {
+                        // 현재 모드에 따라 적절한 대기 메시지 표시
                         const modeMessage = isScanningIdMode ? "신분증 스캔" : "상품 스캔";
                         statusMessage.innerText = `상태: 대기 중 (${modeMessage} 가능)`;
                     }
@@ -601,5 +708,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 스캐너 시작
     startScanner();
 });
