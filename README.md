@@ -34,8 +34,8 @@
 ---
 
 ## 💡서비스 사전 기획 문서
-* **[PRD - 요구사항 정의서](docs/PRD_v1.pdf)**
-* **[기능 명세서](docs/Functional_Specification_v1.pdf)**
+* **[PRD - 요구사항 정의서](docs/PRD_v1.0.pdf)**
+* **[기능 명세서](docs/Functional_Specification_v2.0.pdf)**
 
   
 ## 🛠 기술 스택 (Tech Stack v2.0)
@@ -158,11 +158,12 @@ Codyssey_Term_Project/
 
 ## 🎨 와이어프레임 및 프로토타입
 
-![와이어프레임](docs/Figma_final.png)
+![와이어프레임1](docs/Figma_v1.0_Initial.png)
+![와이어프레임2](docs/Figma_v2.0_additional.png)
 
 ## 📊 시퀀스 다이어그램
 
-![시퀀스 다이어그램](docs/SequenceDiagram_final.png)
+![시퀀스 다이어그램](docs/SequenceDiagram_v2.0.png)
 
 ## 🗂️ ERD (Entity Relationship Diagram)
 
