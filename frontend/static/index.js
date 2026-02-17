@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let scannedIdValue = null;
 
     // API URL: window.API_URL이 설정되어 있으면 사용, 없으면 기본값 사용
-    const API_URL = window.API_URL || "http://127.0.0.1:8001";
+    const API_URL = window.API_URL || "http://127.0.0.1:8000";
 
     const resultText = document.getElementById('result-text');
     const cameraArea = document.getElementById('camera');
@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 try {
                     // 실제 백엔드 API 호출 (POST /log)
-                    const response = await fetch(`${API_URL}/log`, {
+                    const response = await fetch(`${API_URL}/api/logs`, {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statusMessage) statusMessage.innerText = "상태: 서버 조회 중...";
 
         try {
-            const response = await fetch(`${API_URL}/product/${barcode}`);
+            const response = await fetch(`${API_URL}/api/products/${barcode}`);
             const result = await response.json();
 
             console.log("✅ [응답] 서버 데이터:", result);
@@ -319,6 +319,9 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("서버와 연결할 수 없습니다. (백엔드가 켜져 있나요?)");
         }
     }
+
+    // [테스트용] 
+    // window.testScan = handleScannedCode;
 
     /**
      * [데이터 관리] 장바구니 배열에 상품 추가
