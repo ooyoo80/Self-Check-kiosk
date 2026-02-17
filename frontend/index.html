@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Self-Check Kiosk</title>
         <link rel="stylesheet" href="static/index.css">
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     </head>
     <body>
         <h1>show webcam</h1>
@@ -160,8 +161,8 @@
         <script>
             // API URL 설정: 환경 변수 또는 기본값 사용
             window.API_URL = window.API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-                ? 'http://127.0.0.1:8001' 
-                : 'http://127.0.0.1:8001');
+                ? 'http://127.0.0.1:8000' 
+                : 'http://127.0.0.1:8000');
         </script>
         <script src="static/index.js"></script>
         <script>
