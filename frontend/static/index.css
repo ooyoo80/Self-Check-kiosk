@@ -397,3 +397,24 @@ html, body {
 #adminLoginModal .confirm-btn:hover {
     background-color: #000;
 }
+
+/* 동의 여부 뱃지 스타일 */
+.badge-consent {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+/* 동의했을 때 (파란색) */
+.badge-consent.yes {
+    background-color: #e6f7ff;
+    color: #1890ff;
+    border: 1px solid #91d5ff;
+}
+
+/* 해당 없을 때 (회색) */
+.badge-consent.no {
+    color: #bbb;
+}

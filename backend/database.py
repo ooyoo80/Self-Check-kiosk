@@ -36,12 +36,12 @@ def init_db():
     # (2) ConsentLogs 테이블 (total_amount 포함)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS consent_logs (
-            log_id TEXT PRIMARY KEY,
-            timestamp TEXT NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,   -- log_id 말고 id로 해야 합니다!
             target_barcode TEXT NOT NULL,
             consent_agreed BOOLEAN NOT NULL,
-            scanned_id_info TEXT NOT NULL,
-            total_amount INTEGER NOT NULL
+            scanned_id_info TEXT,                   -- NULL 허용 (필수가 아닐 수 있음)
+            total_amount INTEGER,                   -- 이것 때문에 에러 났었죠! (필수)
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP -- 자동으로 시간 입력
         )
     ''')
 

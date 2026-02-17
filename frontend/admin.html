@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 대시보드 | Self-Check Kiosk</title>
+    <link rel="stylesheet" href="static/index.css">
+    <link rel="stylesheet" href="static/admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>📊 매출 장부 (Admin Dashboard)</h1>
+            <div class="header-right">
+                <span id="admin-id-display">관리자님 환영합니다</span>
+                <button id="btn-logout" class="logout-btn">로그아웃</button>
+            </div>
+        </header>
+
+        <main class="admin-content">
+            <div class="summary-cards">
+                <div class="card">
+                    <h3>총 결제 건수</h3>
+                    <p id="total-count">0건</p>
+                </div>
+                <div class="card">
+                    <h3>총 매출액</h3>
+                    <p id="total-revenue" class="highlight">₩0</p>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>상품 바코드</th>
+                            <th>결제 금액</th>
+                            <th>동의 여부</th> <th>신분증 정보 (Masked)</th>
+                            <th>결제 시간</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table-body">
+                        </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        window.API_URL = window.API_URL || "http://127.0.0.1:8000";
+    </script>
+    <script src="static/admin.js"></script>
+</body>
+</html>
