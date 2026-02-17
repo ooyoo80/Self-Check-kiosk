@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const legalModal = document.getElementById('legalModal');
     const legalYesBtn = document.getElementById('btn-legal-yes');
     const legalNoBtn = document.getElementById('btn-legal-no');
-    
+
     const finalPaymentModal = document.getElementById('finalPaymentModal');
 
     const finalPaymentListArea = document.getElementById('paymentItemsList');
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cartListArea) {
         cartListArea.addEventListener('click', handleCartItemClick);
     }
-    
+
     // 유틸리티 함수: 토스트 알림 표시
     function showToast(message, type = "info", duration = 3000) {
         let toast = document.getElementById('app-toast-message');
@@ -74,14 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleScannedID(barcode) {
         console.log(`🆔 [ID 스캔 성공] 인식된 코드: ${barcode}`);
-        
+
         scannedIdValue = barcode;
         console.log("💾 신분증 데이터 임시 저장 완료:", scannedIdValue);
 
         if (statusMessage) statusMessage.innerText = "상태: 신분증 인식 완료";
 
         showToast("신분증 인식이 완료되었습니다.", "success");
-        
+
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         isScanningIdMode = false;
@@ -89,6 +89,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showFinalPaymentModal();
     }
+
+    // [테스트용] 외부에서 호출 가능하게 설정
+    window.handleScannedID = handleScannedID;
 
     // 최종 결제 팝업 UI 업데이트 함수
     function updateFinalPaymentUI() {
@@ -116,15 +119,14 @@ document.addEventListener('DOMContentLoaded', () => {
         finalPaymentTotalAmount.innerText = `₩${totalPrice.toLocaleString()}`;
     }
 
-    // 최종 결제 팝업 표시 함수 (Placeholder)
+    // 최종 결제 팝업 표시 함수
     function showFinalPaymentModal() {
         console.log("🚀 최종 결제 확인 팝업을 띄웁니다.");
-        
+
         if (finalPaymentModal) {
             updateFinalPaymentUI();
             finalPaymentModal.classList.add('show');
         } else {
-            // 팀원이 아직 HTML에 추가하지 않았을 수도 있으니 경고 로그 출력
             console.error("❌ 오류: 최종 결제 팝업 요소(finalPaymentModal)를 찾을 수 없습니다.");
             showToast("최종 결제 팝업을 띄울 수 없습니다. (HTML 확인 필요)", "error");
         }
@@ -175,47 +177,50 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statusMessage) statusMessage.innerText = "상태: 결제 완료 (대기 중)";
     }
 
-    // 최종 결제 팝업 '결제하기' 버튼 클릭 시
+    // 최종 결제 팝업 '결제하기' 버튼 클릭 시 (API 연동 핵심 로직)
     if (finalPayBtn) {
         finalPayBtn.addEventListener('click', async () => {
             console.log("💰 최종 '결제하기' 버튼 클릭!");
 
             // 전송할 데이터 준비 검증
             if (!cartList || cartList.length === 0) {
-                 console.error("❌ 오류: 결제할 상품이 없습니다.");
-                 showToast("결제할 상품이 없습니다.", "error");
-                 return;
+                console.error("❌ 오류: 결제할 상품이 없습니다.");
+                showToast("결제할 상품이 없습니다.", "error");
+                return;
             }
 
             // 주류 포함 여부 확인
             const hasAlcohol = cartList.some(item => item.isAlcohol === true);
             console.log("🍸 주류 포함 여부:", hasAlcohol);
-            
+
             if (hasAlcohol) {
-                // Case 1: 주류 있음 -> 로그 저장 API 호출 필요
+                // Case 1: 주류 있음 -> 로그 저장 API 호출
                 console.log("📡 주류 포함: 로그 저장 시도");
 
                 // 데이터 준비
                 const alcoholItem = cartList.find(item => item.isAlcohol);
-                const targetBarcode = alcoholItem ? alcoholItem.barcode : cartList[0].barcode; // 주류가 없으면 첫 번째 상품 바코드 사용
-
-                // 신분증 스캔 값 확인 
+                // 바코드 가져오기 (없으면 첫 번째 상품 바코드)
+                const targetBarcode = alcoholItem ? alcoholItem.barcode : cartList[0].barcode;
+                // 신분증 정보 가져오기 (없으면 시뮬레이션 문자열)
                 const finalScannedId = scannedIdValue || "SIMULATED_ID_NOT_SCANNED";
+
+                const totalPrice = cartList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
                 showToast("결제 진행 중... (로그 저장)", "info");
                 if (statusMessage) statusMessage.innerText = "상태: 결제(로그 저장) 처리 중...";
 
                 try {
-                    // 실제 백엔드 API 호출 (POST /log)
+                    // API 호출
                     const response = await fetch(`${API_URL}/api/logs`, {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
                         },
                         body: JSON.stringify({
-                            target_barcode: targetBarcode,
-                            consent_agreed: true, // 시나리오상 항상 true
-                            scanned_id_info: finalScannedId,
+                            target_barcode: String(targetBarcode),
+                            consent_agreed: true,
+                            scanned_id_info: String(finalScannedId),
+                            total_amount: Number(totalPrice)
                         }),
                     });
 
@@ -223,19 +228,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log("✅ [응답] 로그 저장 결과:", result);
 
                     if (response.ok && result.status === "success") {
-                        // 성공 시 처리
+                        // 성공 시
                         console.log("✅ 로그 저장 및 결제 완료 성공!");
-                        
+
                         if (finalPaymentModal) {
-                            finalPaymentModal.classList.remove('show'); // 팝업 닫기
+                            finalPaymentModal.classList.remove('show');
                         }
                         showToast("결제가 완료되었습니다. 감사합니다!", "success");
 
-                        // UI 및 데이터 초기화 함수 호출
                         resetUIAfterPayment();
-
                     } else {
-                        // 실패 시 처리 (서버가 에러 응답을 보낸 경우)
+                        // 실패 시
                         console.error("❌ 로그 저장 실패:", result.message || result.detail);
                         throw new Error(result.message || "로그 저장 실패");
                     }
@@ -244,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showToast("결제 실패: " + error.message, "error");
                     if (statusMessage) statusMessage.innerText = "상태: 오류 (결제 실패)";
                 }
+
             } else {
                 // Case 2: 주류 없음 -> 즉시 결제 완료 (로그 저장 X)
                 console.log("🛒 주류 없음: 즉시 결제 완료 처리");
@@ -269,14 +273,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 finalPaymentModal.classList.remove('show');
             }
             showToast("결제가 취소되었습니다.", "warning");
-            
+
             resetUIAfterPayment();
         });
     } else {
-        console.warn("⚠️ '최종 결제 취소' 버튼(btn-final-cancel)을 찾을 수 없습니다. (연동 대기 중)");
+        console.warn("⚠️ '최종 결제 취소' 버튼(btn-final-cancel)을 찾을 수 없습니다.");
     }
 
-    
+
     // 바코드 처리 함수
     async function handleScannedCode(barcode) {
         console.log(`📡 [요청] 서버에 바코드 조회: ${barcode}`);
@@ -293,10 +297,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const product = result.data;
 
                 console.log(`✅ [성공] 상품 인식: ${product.name}, 주류 여부: ${product.isAlcohol}`);
-                
-                addToCart({ ...product, barcode });
 
-                // 주류 안내 메시지 렌더 (새로 추가된 함수 호출)
+                addToCart({
+                    ...product,
+                    barcode
+                });
+
                 renderAlcoholNotice(product, barcode);
 
                 if (statusMessage) statusMessage.innerText = "상태: 대기 중";
@@ -305,29 +311,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 실패 (DB에 없는 상품)
                 console.warn("❌ 서버 응답: 등록되지 않은 상품");
                 if (resultText) {
-                    resultText.innerText = "등록되지 않은 상품입니다. (${barcode})";
+                    resultText.innerText = `등록되지 않은 상품입니다. (${barcode})`;
                     resultText.style.color = "red";
                 }
                 if (statusMessage) statusMessage.innerText = "상태: 오류 (등록되지 않은 상품)";
-                setTimeout(() => { if(resultText) resultText.innerText = "" }, 3000);
-                // 사용자에게는 조용히 있거나, 필요하면 안내 메시지 표시
-                // resultText.innerText = "등록되지 않은 상품입니다.";
+                setTimeout(() => {
+                    if (resultText) resultText.innerText = ""
+                }, 3000);
             }
         } catch (error) {
-            // 서버가 꺼져있거나 인터넷 문제일 때
             console.error("⚠️ 서버 통신 에러:", error);
             alert("서버와 연결할 수 없습니다. (백엔드가 켜져 있나요?)");
         }
     }
 
     // [테스트용] 
-    // window.testScan = handleScannedCode;
+    window.testScan = handleScannedCode;
 
     /**
      * [데이터 관리] 장바구니 배열에 상품 추가
      */
     function addToCart(productToAdd) {
-        // 중복 감지: 같은 바코드가 아주 짧은 시간 내(800ms)에 들어오면 무시
+        // 중복 감지
         try {
             const now = Date.now();
             const last = recentAdds[productToAdd.barcode] || 0;
@@ -336,17 +341,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             recentAdds[productToAdd.barcode] = now;
-        } catch (e) {
-            // 안전성: productToAdd.barcode가 없으면 그냥 진행
-        }
+        } catch (e) {}
+
         const existingItem = cartList.find(item => item.barcode === productToAdd.barcode);
 
         if (existingItem) {
             existingItem.quantity += 1;
         } else {
-            cartList.push({ ...productToAdd, quantity: 1 });
+            cartList.push({
+                ...productToAdd,
+                quantity: 1
+            });
         }
-        // 장바구니 UI 업데이트
         updateCartUI();
     }
 
@@ -357,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const item = cartList.find(item => item.barcode === barcode);
         if (item) {
             item.quantity += change;
-            
+
             if (item.quantity <= 0) {
                 cartList = cartList.filter(item => item.barcode !== barcode);
             }
@@ -367,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * [UI 렌더링] 장바구니 화면을 배열 데이터에 맞춰 다시 그리는 함수
+     * [UI 렌더링] 장바구니 화면 업데이트
      */
     function updateCartUI() {
         if (!cartListArea) {
@@ -381,8 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cartList.forEach((item) => {
             const itemTotalPrice = item.price * item.quantity;
             totalPrice += itemTotalPrice;
-            
-            // HTML 템플릿 생성
+
             const itemHTML = `
                 <div class="item-card" data-barcode="${item.barcode}">
                     <div class="item-info">
@@ -399,33 +404,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             `;
-            // 생성 HTML 목록 영역에 추가 (항목은 추가된 순서대로 아래로 쌓이도록 'beforeend' 사용)
             cartListArea.insertAdjacentHTML('beforeend', itemHTML);
         });
 
         if (totalAmountElement) {
             totalAmountElement.innerText = `₩${totalPrice.toLocaleString()}`;
         }
-
-        // 새로 추가된 항목이 맨 위에 오므로 스크롤을 맨 위로 이동
         cartListArea.scrollTop = 0;
     }
 
     // 주류 안내 메시지 렌더링 함수
     function renderAlcoholNotice(product, barcode) {
         try {
-            // products.json에서 불러오는 불리언 isAlcohol이 true이면 주류로 판단
             const isAlcohol = !!(product && product.isAlcohol === true);
 
             if (!isAlcohol) return;
 
-            // 중복 표시 방지
             const existing = document.getElementById('alcohol-notice');
             if (existing) existing.remove();
 
             const notice = document.createElement('div');
             notice.id = 'alcohol-notice';
-            
             notice.className = 'alcohol-notice-popup';
 
             notice.innerHTML = `
@@ -461,8 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        paneRight.innerHTML = '';
-        const guideHTML = `
+        paneRight.innerHTML = `
             <div class="id-scan-guide-container">
                 <div class="guide-icon">🆔</div>
                 <h2>신분증 바코드를 스캔해주세요</h2>
@@ -476,7 +474,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p class="sub-text">인식이 완료되면 자동으로 다음 단계로 넘어갑니다.</p>
             </div>
         `;
-        paneRight.insertAdjacentHTML('beforeend', guideHTML);
 
         isScanningIdMode = true;
         console.log("🔄 상태 변경: isScanningIdMode = true");
@@ -489,116 +486,84 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 결제 버튼 클릭 핸들러 (주류 판단 로직)
     function handlePaymentClick() {
-        // 장바구니 비었는지 확인
         if (cartList.length === 0) {
             alert("장바구니에 담긴 상품이 없습니다.");
             return;
         }
 
-        // 주류 포함 여부 확인
         const hasAlcohol = cartList.some(item => item.isAlcohol === true);
 
         if (hasAlcohol) {
             console.log("🚨 결제 시도: 주류 포함됨! -> 성인 인증 팝업 필요");
-
             if (ageModal) {
                 ageModal.classList.add('show');
-                console.log("팝업 클래스 'show' 추가 완료. 현재 클래스:", ageModal.className);
-            } else {
-                console.error("❌ 오류: ageModal 요소를 찾을 수 없습니다.");
             }
         } else {
-            // 주류 없음 -> 즉시 결제 완료
             console.log("✅ 결제 시도: 주류 없음 -> 즉시 결제 완료");
             showFinalPaymentModal();
         }
     }
 
-    // 결제 버튼에 이벤트 리스너 연결
+    // 결제 버튼 이벤트 리스너
     if (payButton) {
         payButton.addEventListener('click', handlePaymentClick);
-        console.log("결제 버튼 이벤트 리스너가 연결되었습니다.");
-    } else {
-        console.warn("결제 버튼 요소를 찾을 수 없습니다 (.pay-button)");
     }
 
-    // 1차 팝업 버튼 이벤트
+    // 모달 이벤트 리스너들
     if (ageYesBtn && ageModal && legalModal) {
         ageYesBtn.addEventListener('click', () => {
-            console.log("1차 '예' 클릭 -> 1차 닫고, 2차 팝업 열기");
             ageModal.classList.remove('show');
             legalModal.classList.add('show');
         });
     }
     if (ageNoBtn && ageModal) {
         ageNoBtn.addEventListener('click', () => {
-            console.log("1차 '아니오' 클릭 -> 팝업 닫기 및 주류 제거");
             ageModal.classList.remove('show');
-            console.log("팝업 닫힌 후 클래스:", ageModal.className);
         });
     }
 
     if (legalYesBtn && legalModal) {
         legalYesBtn.addEventListener('click', () => {
-            console.log("2차 '예' 클릭 -> 2차 닫고, 다음 단계(신분증 인식)로 이동 예정");
             legalModal.classList.remove('show');
-            // 3차 신분증 인식 웹캠 화면 보여주는 로직 호출
             showIdScanScreen();
         });
-        
-    } else {
-        console.warn("⚠️ 2차 '예' 버튼 또는 팝업 요소를 찾을 수 없어 이벤트를 연결하지 못했습니다.");
     }
-    
+
     if (legalNoBtn && legalModal) {
         legalNoBtn.addEventListener('click', () => {
-            console.log("🖱️ 2차 '아니오' 클릭 -> 팝업 닫기 및 주류 제거");
             legalModal.classList.remove('show');
-            clearAlcoholItems(); // 주류 제거
+            clearAlcoholItems();
         });
-        console.log("✅ 2차 '아니오' 버튼 이벤트 리스너 연결 완료");
-    } else {
-        console.warn("⚠️ 2차 '아니오' 버튼 또는 팝업 요소를 찾을 수 없어 이벤트를 연결하지 못했습니다.");
     }
 
     // 카메라 스캐너 설정 (Quagga)
     function startScanner() {
         const cameraElement = document.getElementById('camera');
-        if (!cameraElement) {
-            console.error("❌ 오류: 카메라 요소(camera)를 찾을 수 없습니다.");
-            return;
-        }
+        if (!cameraElement) return;
 
-        Quagga.init(
-            {
-                inputStream: {
-                    name: 'Live',
-                    type: 'LiveStream',
-                    target: cameraArea,
-                },
-                decoder: {
-                    readers: ['ean_reader', 'code_128_reader', 'ean_8_reader', 'code_39_reader', 'code_39_vin_reader', 'codabar_reader', 'upc_reader', 'upc_e_reader', 'i2of5_reader'],
-                },
-                locate: true,
-                frequency: 10
+        Quagga.init({
+            inputStream: {
+                name: 'Live',
+                type: 'LiveStream',
+                target: cameraArea,
             },
+            decoder: {
+                readers: ['ean_reader', 'code_128_reader', 'ean_8_reader', 'code_39_reader', 'upc_reader'],
+            },
+            locate: true,
+            frequency: 10
+        }, function(err) {
+            if (err) {
+                console.error("Quagga initialization error : ", err);
+                return;
+            }
+            Quagga.start();
+            const videoElement = cameraArea.querySelector('video');
+            if (videoElement) {
+                videoElement.style.transform = 'scaleX(-1)';
+            }
+        });
 
-            function (err) {
-                if (err) {
-                    console.error("Quagga initialization error : ",err);
-                    return;
-                }
-
-                console.log("Quagga initialization succeeded");
-                Quagga.start();
-
-                const videoElement = cameraArea.querySelector('video');
-                if (videoElement) {
-                    videoElement.style.transform = 'scaleX(-1)';
-                }
-            }   
-        );
-        
         let isScanning = false;
         let lastDetectedCode = null;
         let lastDetectedAt = 0;
@@ -607,32 +572,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const code = data.codeResult.code;
             const now = Date.now();
 
-            // 동일 코드가 짧은 시간(2500ms) 내에 다시 들어오면 무시
             if (code === lastDetectedCode && (now - lastDetectedAt) < 2500) {
-                // console.debug('Quagga: duplicate detection suppressed', code);
                 return;
             }
             lastDetectedCode = code;
             lastDetectedAt = now;
 
-            if (isScanning) return; // 중복 스캔 방지
+            if (isScanning) return;
 
             console.log("Barcode detected: ", code);
+            isScanning = true;
 
-            isScanning = true; // 스캔 처리 시작
             let processPromise;
             if (isScanningIdMode) {
-                console.log("ℹ️ 현재 신분증 스캔 모드입니다.");
                 processPromise = handleScannedID(code);
             } else {
-                console.log("ℹ️ 현재 상품 스캔 모드입니다.");
                 processPromise = handleScannedCode(code);
             }
             processPromise.finally(() => {
                 setTimeout(() => {
                     isScanning = false;
                     if (statusMessage) {
-                        // 현재 모드에 따라 적절한 대기 메시지 표시
                         const modeMessage = isScanningIdMode ? "신분증 스캔" : "상품 스캔";
                         statusMessage.innerText = `상태: 대기 중 (${modeMessage} 가능)`;
                     }
@@ -641,7 +601,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 스캐너 시작
     startScanner();
 });
-
